@@ -1,0 +1,70 @@
+# docker-compose.dev.yml — OpenClaw local dev on macOS
+# Pattern mirrors the Lucee dev compose:
+#   - Source bind-mounted from host (./)
+#   - State bind-mounted from host (~/.openclaw, ~/.openclaw-auth-profile-secrets)
+#   - .env file in project root supplies host-specific values
+# One justified divergence from Lucee:
+#   - node_modules lives in a Docker named volume to avoid macOS bind-mount
+#     filesystem slowness and to isolate Linux binaries from the host.
+#
+# Usage: docker compose -f docker-compose.dev.yml up
+
+services:
+  openclaw-gateway-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: openclaw-gateway-dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # --- Container-side paths (Linux paths, must override anything from .env) ---
+      # macOS host paths leaking through .env would resolve as /Users/mac/... inside
+      # the Linux container and fail with EACCES. Pin them here.
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      # --- Dev-mode behavior ---
+      # Skip channel startup — no WhatsApp/Telegram/etc. tokens needed for dashboard dev.
+      OPENCLAW_SKIP_CHANNELS: "1"
+      TERM: xterm-256color
+      TZ: ${OPENCLAW_TZ:-UTC}
+      # Blank in .env -> OpenClaw auto-generates on first start.
+      # Loopback-only port binding means no security risk from absence.
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+    volumes:
+      # Source bind mount — edits on Mac reflect immediately in the container.
+      - ./:/app
+      # node_modules as a named volume — Linux-native, fast, isolated from host.
+      - openclaw_node_modules:/app/node_modules
+      # State bind mount — survives container rebuilds, visible from Finder.
+      - ${HOME}/.openclaw:/home/node/.openclaw
+      # Auth profile secrets — separate dir per upstream's documented pattern.
+      - ${HOME}/.openclaw-auth-profile-secrets:/home/node/.config/openclaw
+    ports:
+      # Loopback-only — no LAN exposure of the dev gateway.
+      - "127.0.0.1:${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+    extra_hosts:
+      # Reach Mac-side `ollama serve` from inside the container.
+      - "host.docker.internal:host-gateway"
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+    # First run installs deps into the named volume, then starts the gateway in
+    # watch mode (hot reload on source changes). pnpm short-circuits if deps are
+    # already up to date, so subsequent starts are fast.
+    command:
+      - sh
+      - -c
+      - "pnpm install --frozen-lockfile && pnpm gateway:dev"
+
+volumes:
+  openclaw_node_modules:

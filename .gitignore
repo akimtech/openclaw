@@ -106,7 +106,7 @@ USER.md
 *.zip
 .idea
 .vscode/
-
+*.bak
 # local tooling
 .serena/
 

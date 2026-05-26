@@ -1,0 +1,11 @@
+# Dockerfile.dev — OpenClaw local development on macOS
+# Mirrors the Lucee dev pattern: runtime image only, no source baked in.
+# Source comes in via bind mount from the host; node_modules lives in a named volume.
+
+FROM node:24-bookworm
+
+# Activate the exact pnpm version pinned in OpenClaw's package.json (packageManager field).
+# Corepack ships with Node 24, so no install is needed — we're just activating.
+RUN corepack enable && corepack prepare pnpm@11.1.0 --activate
+
+WORKDIR /app
