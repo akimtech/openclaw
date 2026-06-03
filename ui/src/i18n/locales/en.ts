@@ -143,7 +143,7 @@ export const en: TranslationMap = {
     },
   },
   instances: {
-    title: "Connected Instances",
+    title: "+ Connected Instances",
     subtitle: "Presence beacons from the gateway and clients.",
     showHosts: "Show hosts and IPs",
     hideHosts: "Hide hosts and IPs",
